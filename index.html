@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Flip 7 – Compteur de points</title>
+  <meta name="description" content="Compteur de points en ligne pour le jeu Flip 7. Personnalisez les joueurs et suivez les scores jusqu'à 200 points." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:   #1a1a2e;
+      --bg2:  #16213e;
+      --bg3:  #0f3460;
+      --gold: #FECA57;
+    }
+
+    body {
+      background: linear-gradient(135deg, var(--bg) 0%, var(--bg2) 50%, var(--bg3) 100%);
+      min-height: 100vh;
+      font-family: -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
+      color: #fff;
+    }
+
+    /* ═══════════════════════════════════════
+       SHARED
+    ═══════════════════════════════════════ */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    .page-wrap {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 32px 16px 60px;
+    }
+
+    .logo {
+      font-size: 3rem;
+      font-weight: 900;
+      text-align: center;
+      color: var(--gold);
+      letter-spacing: 4px;
+      text-shadow: 0 4px 24px rgba(254,202,87,.4);
+      margin-bottom: 4px;
+    }
+
+    .tagline {
+      text-align: center;
+      color: rgba(255,255,255,.4);
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 36px;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 800;
+      border-radius: 12px;
+      transition: transform .1s, opacity .15s;
+    }
+    button:active { transform: scale(.96); }
+
+    .btn-primary  { background: var(--gold); color: #1a1a2e; }
+    .btn-primary:hover  { opacity: .9; }
+    .btn-ghost    { background: rgba(255,255,255,.08); color: rgba(255,255,255,.65); }
+    .btn-ghost:hover { background: rgba(255,255,255,.13); }
+    .btn-danger   { background: rgba(255,80,80,.18); color: #ff7070; }
+
+    /* ═══════════════════════════════════════
+       SETUP SCREEN
+    ═══════════════════════════════════════ */
+    .setup-card {
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 20px;
+      padding: 28px 24px;
+      margin-bottom: 16px;
+    }
+
+    .setup-card h2 {
+      font-size: 1rem;
+      font-weight: 800;
+      color: rgba(255,255,255,.5);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+    }
+
+    /* Win score */
+    .win-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .win-row label {
+      flex: 1;
+      font-size: .95rem;
+      font-weight: 700;
+      color: rgba(255,255,255,.7);
+    }
+
+    .win-row label span {
+      display: block;
+      font-size: .75rem;
+      font-weight: 600;
+      color: rgba(255,255,255,.35);
+      margin-top: 2px;
+    }
+
+    #win-score-input {
+      width: 90px;
+      background: rgba(255,255,255,.08);
+      border: 1.5px solid rgba(255,255,255,.15);
+      border-radius: 10px;
+      color: var(--gold);
+      font-size: 1.4rem;
+      font-weight: 900;
+      padding: 8px;
+      text-align: center;
+      outline: none;
+      font-family: inherit;
+      -webkit-appearance: none;
+    }
+    #win-score-input:focus { border-color: var(--gold); }
+    #win-score-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    /* Player list */
+    #player-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+
+    .player-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: slideIn .2s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .player-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .player-row input[type=text] {
+      flex: 1;
+      background: rgba(255,255,255,.08);
+      border: 1.5px solid rgba(255,255,255,.12);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 10px 12px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color .2s;
+    }
+    .player-row input[type=text]:focus { border-color: var(--gold); }
+    .player-row input[type=text]::placeholder { color: rgba(255,255,255,.2); font-weight: 500; }
+
+    .btn-remove {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      padding: 0;
+    }
+
+    .btn-add {
+      width: 100%;
+      padding: 10px;
+      font-size: .9rem;
+      border: 1.5px dashed rgba(255,255,255,.2);
+      background: transparent;
+      color: rgba(255,255,255,.4);
+      border-radius: 10px;
+    }
+    .btn-add:hover { border-color: var(--gold); color: var(--gold); }
+
+    .start-btn {
+      width: 100%;
+      padding: 16px;
+      font-size: 1.1rem;
+      background: var(--gold);
+      color: #1a1a2e;
+    }
+
+    .start-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    .error-msg {
+      color: #ff7070;
+      font-size: .8rem;
+      font-weight: 700;
+      text-align: center;
+      margin-top: 10px;
+      display: none;
+    }
+
+    /* ═══════════════════════════════════════
+       GAME SCREEN
+    ═══════════════════════════════════════ */
+    .game-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+
+    .back-btn {
+      background: rgba(255,255,255,.08);
+      color: rgba(255,255,255,.6);
+      font-size: .8rem;
+      padding: 7px 14px;
+      border-radius: 10px;
+    }
+
+    .cards-grid {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      border-radius: 14px;
+      padding: 14px 12px 12px;
+      background: rgba(255,255,255,.06);
+      border: 2px solid rgba(255,255,255,.08);
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow .3s, border-color .3s;
+    }
+
+    .card.leader { border-color: var(--gold); box-shadow: 0 0 20px rgba(254,202,87,.3); }
+
+    .card.won { animation: winPulse 1s ease-in-out infinite alternate; }
+
+    @keyframes winPulse {
+      from { box-shadow: 0 0 20px rgba(254,202,87,.4); }
+      to   { box-shadow: 0 0 50px rgba(254,202,87,.9); }
+    }
+
+    .card-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      border-radius: 14px 14px 0 0;
+    }
+
+    .card-crown {
+      position: absolute;
+      top: 8px; right: 8px;
+      font-size: 1rem;
+      display: none;
+    }
+
+    .card-name {
+      font-size: .95rem;
+      font-weight: 800;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-score {
+      font-size: 2.2rem;
+      font-weight: 900;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .progress {
+      height: 5px;
+      background: rgba(255,255,255,.1);
+      border-radius: 10px;
+      margin-bottom: 7px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 10px;
+      transition: width .4s ease;
+    }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 3px; min-height: 18px; }
+
+    .chip {
+      font-size: .63rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.12);
+      color: rgba(255,255,255,.6);
+    }
+
+    /* Entry panel */
+    .panel {
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 18px;
+      padding: 18px 16px;
+      margin-bottom: 18px;
+    }
+
+    .panel-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      background: var(--gold);
+      color: #1a1a2e;
+      font-size: .72rem;
+      font-weight: 800;
+      padding: 2px 10px;
+      border-radius: 20px;
+    }
+
+    .score-inputs {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .input-group { display: flex; flex-direction: column; gap: 4px; }
+
+    .input-label {
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    input[type=number] {
+      background: rgba(255,255,255,.08);
+      border: 1.5px solid rgba(255,255,255,.15);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 1.3rem;
+      font-weight: 900;
+      padding: 8px 6px;
+      width: 100%;
+      text-align: center;
+      outline: none;
+      font-family: inherit;
+      -webkit-appearance: none;
+      transition: border-color .2s;
+    }
+    input[type=number]:focus { border-color: var(--gold); background: rgba(254,202,87,.08); }
+    input[type=number]::placeholder { color: rgba(255,255,255,.2); }
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+
+    .btn-validate { padding: 10px 20px; font-size: .95rem; }
+    .btn-reset    { padding: 10px 16px; font-size: .85rem; }
+    .btn-del      { font-size: .72rem; padding: 5px 10px; border-radius: 8px; }
+
+    /* History */
+    .history {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 18px;
+      overflow: hidden;
+    }
+
+    .history-hdr {
+      font-size: .85rem;
+      font-weight: 700;
+      color: rgba(255,255,255,.35);
+      padding: 12px 16px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+
+    .tbl-wrap { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+
+    th {
+      background: rgba(255,255,255,.04);
+      color: rgba(255,255,255,.35);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 8px 10px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 7px 10px;
+      text-align: center;
+      color: rgba(255,255,255,.65);
+      border-top: 1px solid rgba(255,255,255,.04);
+      white-space: nowrap;
+    }
+
+    tr:hover td { background: rgba(255,255,255,.025); }
+    .td-rnd   { color: var(--gold); font-weight: 800; }
+    .td-total { color: #fff; font-weight: 900; font-size: .95rem; }
+    .td-zero  { color: rgba(255,255,255,.2); }
+
+    /* Winner overlay */
+    #winner-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.85);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #winner-overlay.show { display: flex; animation: fadeIn .3s ease; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .winner-box {
+      background: linear-gradient(135deg, #1a1a2e, #0f3460);
+      border: 3px solid var(--gold);
+      border-radius: 26px;
+      padding: 36px 44px;
+      text-align: center;
+      box-shadow: 0 0 80px rgba(254,202,87,.4);
+      animation: popIn .4s cubic-bezier(.34,1.56,.64,1);
+      max-width: 320px;
+      width: 90%;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(.6); opacity: 0; }
+      to   { transform: scale(1);  opacity: 1; }
+    }
+
+    .winner-emoji { font-size: 3.5rem; margin-bottom: 10px; }
+    .winner-label { color: var(--gold); font-size: .8rem; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px; }
+    .winner-name  { font-size: 2.4rem; font-weight: 900; margin-bottom: 4px; }
+    .winner-pts   { color: rgba(255,255,255,.4); font-weight: 700; margin-bottom: 22px; }
+    .winner-btns  { display: flex; flex-direction: column; gap: 8px; }
+    .winner-btns button { padding: 11px; font-size: .9rem; }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      color: rgba(255,255,255,.15);
+      font-size: .72rem;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     SETUP SCREEN
+══════════════════════════════════════════ -->
+<div id="screen-setup" class="screen active">
+  <div class="page-wrap">
+    <div class="logo">FLIP 7</div>
+    <p class="tagline">Compteur de points</p>
+
+    <!-- Win score -->
+    <div class="setup-card">
+      <h2>Objectif</h2>
+      <div class="win-row">
+        <label>
+          Points pour gagner
+          <span>Score à atteindre en premier</span>
+        </label>
+        <input type="number" id="win-score-input" value="200" min="1" inputmode="numeric" />
+      </div>
+    </div>
+
+    <!-- Players -->
+    <div class="setup-card">
+      <h2>Joueurs</h2>
+      <div id="player-list"></div>
+      <button class="btn-add" onclick="addPlayer()">+ Ajouter un joueur</button>
+    </div>
+
+    <p class="error-msg" id="setup-error"></p>
+    <button class="start-btn btn-primary" onclick="startGame()">🃏 Démarrer la partie</button>
+
+    <footer>Flip 7 · Compteur de points en ligne</footer>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     GAME SCREEN
+══════════════════════════════════════════ -->
+<div id="screen-game" class="screen">
+  <div class="page-wrap">
+
+    <div class="game-header">
+      <div class="logo" style="font-size:2rem;margin-bottom:0">FLIP 7</div>
+      <button class="back-btn btn-ghost" onclick="backToSetup()">⚙ Modifier</button>
+    </div>
+
+    <div class="cards-grid" id="cards-grid"></div>
+
+    <div class="panel">
+      <div class="panel-title">
+        Saisir les scores
+        <span class="badge" id="round-badge">Manche 1</span>
+      </div>
+      <div class="score-inputs" id="score-inputs"></div>
+      <div class="btn-row">
+        <button class="btn-ghost btn-reset" onclick="resetGame()">Réinitialiser</button>
+        <button class="btn-primary btn-validate" onclick="submitRound()">✓ Valider</button>
+      </div>
+    </div>
+
+    <div class="history" id="history-panel" style="display:none">
+      <div class="history-hdr">Historique des manches</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead id="history-head"></thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>Flip 7 · Compteur de points en ligne</footer>
+  </div>
+</div>
+
+<!-- Winner overlay -->
+<div id="winner-overlay">
+  <div class="winner-box">
+    <div class="winner-emoji">🎉</div>
+    <div class="winner-label">Gagnant·e !</div>
+    <div class="winner-name" id="winner-name"></div>
+    <div class="winner-pts"  id="winner-pts"></div>
+    <div class="winner-btns">
+      <button class="btn-primary"  onclick="closeWinner()">Continuer la partie</button>
+      <button class="btn-ghost"    onclick="resetGame()">Nouvelle partie</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Palette ──────────────────────────────────────────────────────
+  const PALETTE = [
+    "#FF6B6B","#FF9F43","#FECA57","#48DBFB",
+    "#FF9FF3","#54A0FF","#A29BFE","#00D2D3",
+    "#26de81","#fd9644","#fc5c65","#45aaf2",
+  ];
+
+  // ── State ────────────────────────────────────────────────────────
+  let players = [];   // [{name, color}]
+  let winScore = 200;
+  let rounds   = [];  // [[score0, score1, ...]]
+
+  // ══════════════════════════════════════════
+  // SETUP
+  // ══════════════════════════════════════════
+  const DEFAULT_NAMES = ["Joueur 1","Joueur 2","Joueur 3","Joueur 4"];
+
+  function initSetup() {
+    const list = document.getElementById("player-list");
+    list.innerHTML = "";
+    DEFAULT_NAMES.forEach((n,i) => addPlayer(n));
+  }
+
+  function addPlayer(defaultName) {
+    const list  = document.getElementById("player-list");
+    const idx   = list.children.length;
+    const color = PALETTE[idx % PALETTE.length];
+
+    const row = document.createElement("div");
+    row.className = "player-row";
+    row.dataset.idx = idx;
+    row.innerHTML = `
+      <div class="player-dot" style="background:${color}"></div>
+      <input type="text" placeholder="Nom du joueur" maxlength="20"
+             value="${defaultName || ""}"
+             oninput="updateDots()"
+             onkeydown="if(event.key==='Enter')addPlayer()" />
+      <button class="btn-danger btn-remove" onclick="removePlayer(this)" title="Supprimer">✕</button>`;
+    list.appendChild(row);
+    updateDots();
+
+    // focus last input if added via button
+    if (!defaultName) {
+      row.querySelector("input").focus();
+    }
+  }
+
+  function removePlayer(btn) {
+    const list = document.getElementById("player-list");
+    if (list.children.length <= 2) {
+      showError("Il faut au moins 2 joueurs.");
+      return;
+    }
+    btn.closest(".player-row").remove();
+    updateDots();
+  }
+
+  function updateDots() {
+    document.querySelectorAll(".player-row").forEach((row, i) => {
+      row.querySelector(".player-dot").style.background = PALETTE[i % PALETTE.length];
+    });
+  }
+
+  function showError(msg) {
+    const el = document.getElementById("setup-error");
+    el.textContent = msg;
+    el.style.display = "block";
+    setTimeout(() => { el.style.display = "none"; }, 3000);
+  }
+
+  function startGame() {
+    const rows = document.querySelectorAll(".player-row input[type=text]");
+    const names = Array.from(rows).map(r => r.value.trim()).filter(Boolean);
+
+    if (names.length < 2) { showError("Il faut au moins 2 joueurs avec un nom."); return; }
+
+    const win = parseInt(document.getElementById("win-score-input").value);
+    if (!win || win < 1) { showError("Score objectif invalide."); return; }
+
+    winScore = win;
+    players  = names.map((name, i) => ({ name, color: PALETTE[i % PALETTE.length] }));
+    rounds   = [];
+
+    buildGame();
+    showScreen("screen-game");
+  }
+
+  function backToSetup() {
+    if (rounds.length > 0 && !confirm("Retourner à la configuration ? La partie en cours sera conservée.")) return;
+    showScreen("screen-setup");
+  }
+
+  // ══════════════════════════════════════════
+  // GAME BUILD
+  // ══════════════════════════════════════════
+  function buildGame() {
+    buildCards();
+    buildInputs();
+    buildHistoryHead();
+    render();
+  }
+
+  function buildCards() {
+    const grid = document.getElementById("cards-grid");
+    const n = players.length;
+    // responsive columns
+    const cols = n <= 3 ? n : n <= 6 ? 3 : 4;
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    grid.innerHTML = players.map((p,i) => `
+      <div class="card" id="card-${i}">
+        <div class="card-bar" style="background:${p.color}"></div>
+        <span class="card-crown" id="crown-${i}">👑</span>
+        <div class="card-name">${escHtml(p.name)}</div>
+        <div class="card-score" id="score-${i}" style="color:${p.color}">0</div>
+        <div class="progress"><div class="progress-fill" id="bar-${i}" style="background:${p.color};width:0%"></div></div>
+        <div class="chips" id="chips-${i}"></div>
+      </div>`).join("");
+  }
+
+  function buildInputs() {
+    const wrap = document.getElementById("score-inputs");
+    const n = players.length;
+    const cols = n <= 3 ? n : n <= 6 ? 3 : 4;
+    wrap.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    wrap.innerHTML = players.map((p,i) => `
+      <div class="input-group">
+        <label class="input-label" style="color:${p.color}">${escHtml(p.name)}</label>
+        <input type="number" inputmode="numeric" id="inp-${i}" placeholder="0" />
+      </div>`).join("");
+
+    // Enter on last = submit
+    const last = document.getElementById(`inp-${players.length - 1}`);
+    if (last) last.addEventListener("keydown", e => { if (e.key === "Enter") submitRound(); });
+  }
+
+  function buildHistoryHead() {
+    document.getElementById("history-head").innerHTML =
+      "<tr><th>Manche</th>" +
+      players.map(p => `<th>${escHtml(p.name)}</th>`).join("") +
+      "<th></th></tr>";
+  }
+
+  // ══════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════
+  function totals() {
+    return players.map((_, i) => rounds.reduce((s, r) => s + (r[i] || 0), 0));
+  }
+
+  function render() {
+    const t   = totals();
+    const max = Math.max(...t);
+    const leaderIdx = max > 0 ? t.indexOf(max) : -1;
+
+    players.forEach((p, i) => {
+      document.getElementById(`score-${i}`).textContent = t[i];
+      document.getElementById(`bar-${i}`).style.width   = Math.min(t[i] / winScore * 100, 100) + "%";
+
+      const crown = document.getElementById(`crown-${i}`);
+      crown.style.display = i === leaderIdx ? "block" : "none";
+
+      const card = document.getElementById(`card-${i}`);
+      card.className = "card" +
+        (i === leaderIdx && max > 0 ? " leader" : "") +
+        (t[i] >= winScore ? " won" : "");
+
+      // chips
+      document.getElementById(`chips-${i}`).innerHTML =
+        rounds.map((r, ri) =>
+          r[i] > 0 ? `<span class="chip">M${ri+1}: ${r[i]}</span>` : ""
+        ).join("") ||
+        `<span style="color:rgba(255,255,255,.2);font-size:.62rem">—</span>`;
+    });
+
+    document.getElementById("round-badge").textContent = `Manche ${rounds.length + 1}`;
+    renderHistory(t);
+  }
+
+  function renderHistory(t) {
+    const panel = document.getElementById("history-panel");
+    panel.style.display = rounds.length > 0 ? "block" : "none";
+
+    document.getElementById("history-body").innerHTML =
+      rounds.map((r, i) =>
+        `<tr>
+          <td class="td-rnd">#${i+1}</td>
+          ${r.map(v => `<td class="${v > 0 ? "" : "td-zero"}">${v > 0 ? v : "—"}</td>`).join("")}
+          <td><button class="btn-danger btn-del" onclick="deleteRound(${i})">✕</button></td>
+        </tr>`
+      ).join("") +
+      `<tr>
+        <td class="td-rnd">Total</td>
+        ${t.map(v => `<td class="td-total">${v}</td>`).join("")}
+        <td></td>
+      </tr>`;
+  }
+
+  // ══════════════════════════════════════════
+  // ACTIONS
+  // ══════════════════════════════════════════
+  function submitRound() {
+    const round = players.map((_, i) => {
+      const v = parseInt(document.getElementById(`inp-${i}`).value);
+      return isNaN(v) ? 0 : v;
+    });
+    if (round.every(v => v === 0)) return;
+
+    rounds.push(round);
+    players.forEach((_, i) => { document.getElementById(`inp-${i}`).value = ""; });
+    document.getElementById("inp-0").focus();
+    render();
+    checkWinner();
+  }
+
+  function deleteRound(idx) {
+    rounds.splice(idx, 1);
+    render();
+  }
+
+  function checkWinner() {
+    const t   = totals();
+    const max = Math.max(...t);
+    if (max < winScore) return;
+    const idx = t.indexOf(max);
+    document.getElementById("winner-name").textContent = players[idx].name;
+    document.getElementById("winner-pts").textContent  = `${t[idx]} points`;
+    document.getElementById("winner-overlay").classList.add("show");
+  }
+
+  function closeWinner() {
+    document.getElementById("winner-overlay").classList.remove("show");
+  }
+
+  function resetGame() {
+    if (!confirm("Réinitialiser les scores ?")) return;
+    rounds = [];
+    closeWinner();
+    render();
+    players.forEach((_, i) => { document.getElementById(`inp-${i}`).value = ""; });
+  }
+
+  // ══════════════════════════════════════════
+  // UTILS
+  // ══════════════════════════════════════════
+  function showScreen(id) {
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+    window.scrollTo(0, 0);
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  // ── Init ─────────────────────────────────
+  initSetup();
+</script>
+</body>
+</html>
